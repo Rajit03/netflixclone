@@ -1,0 +1,66 @@
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+
+# Load the Energy Indicators file and clean it up
+energy_file_path = r'C:\Users\rajit\OneDrive\Documents\Energy Indicators.xlsx'
+
+# Read the Excel file, skip the footer and the first few unnecessary rows and columns
+energy_df = pd.read_excel(energy_file_path, skipfooter=38, skiprows=17, usecols=[2, 3, 4, 5], 
+                          names=['Country', 'Energy Supply', 'Energy Supply per Capita', '% Renewable'])
+
+# Convert "..." to NaN
+energy_df.replace("...", np.nan, inplace=True)
+
+# Convert Energy Supply from petajoules to gigajoules
+energy_df['Energy Supply'] *= 1000000
+
+# Rename specific countries
+country_rename_map = {
+    "Republic of Korea": "South Korea",
+    "United States of America": "United States",
+    "United Kingdom of Great Britain and Northern Ireland": "United Kingdom",
+    "China, Hong Kong Special Administrative Region": "Hong Kong"
+}
+energy_df['Country'] = energy_df['Country'].replace(country_rename_map)
+
+# Remove parenthesis from country names
+energy_df['Country'] = energy_df['Country'].str.replace(r"\(.*\)", "", regex=True).str.strip()
+
+# Load the world_bank.csv file (GDP data)
+gdp_file_path = r'C:\Users\rajit\OneDrive\Documents\world_bank.csv'
+gdp_df = pd.read_csv(gdp_file_path, skiprows=4)
+
+# Rename specific countries in GDP data
+gdp_country_rename_map = {
+    "Korea, Rep.": "South Korea",
+    "Iran, Islamic Rep.": "Iran",
+    "Hong Kong SAR, China": "Hong Kong"
+}
+gdp_df['Country Name'] = gdp_df['Country Name'].replace(gdp_country_rename_map)
+
+# Load the scimagojr-3.xlsx file (ScimEn data)
+scimen_file_path = r'C:\Users\rajit\OneDrive\Documents\scimagojr-3.xlsx'
+scimen_df = pd.read_excel(scimen_file_path)
+
+# Keep only the top 15 countries by rank
+scimen_top_15 = scimen_df[scimen_df['Rank'] <= 15]
+
+# Join the datasets on the intersection of country names
+gdp_years = [str(year) for year in range(2006, 2016)]
+gdp_df = gdp_df[['Country Name'] + gdp_years]
+
+# Merge the dataframes on country names (inner join)
+merged_df = pd.merge(pd.merge(scimen_top_15, energy_df, how='inner', left_on='Country', right_on='Country'), 
+                     gdp_df, how='inner', left_on='Country', right_on='Country Name').drop(columns='Country Name')
+
+# Set the index to 'Country' and sort by 'Rank'
+merged_df.set_index('Country', inplace=True)
+merged_df.sort_values(by='Rank', inplace=True)
+
+# Display the final merged dataframe shape and type
+print(merged_df.shape)  # (7, 20)
+print(type(merged_df))  # pandas.core.frame.DataFrame
+
+# Optionally, export the final dataframe to a CSV file
+merged_df.to_csv(r'C:\Users\rajit\OneDrive\Documents\world_bank.csv')
